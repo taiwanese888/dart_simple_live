@@ -1,0 +1,53 @@
+name: build-apk-debug
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+          cache: "gradle"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.x"
+          cache: true
+
+      # ?冽??Ｙ? debug keystore 銝血神??key.properties嚗?摰蝪賜??摩??debug key 蝪賜?
+      - name: Generate debug keystore & key.properties
+        run: |
+          keytool -genkeypair -v \
+            -keystore "$HOME/debug.keystore" \
+            -storepass android -keypass android \
+            -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+          echo "storeFile=$HOME/debug.keystore" > simple_live_app/android/key.properties
+          echo "storePassword=android" >> simple_live_app/android/key.properties
+          echo "keyPassword=android" >> simple_live_app/android/key.properties
+          echo "keyAlias=androiddebugkey" >> simple_live_app/android/key.properties
+
+      - name: Restore packages
+        run: |
+          cd simple_live_app
+          flutter pub get
+
+      - name: Build APK
+        run: |
+          cd simple_live_app
+          flutter build apk --release --split-per-abi
+
+      - name: Upload APK to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: simple_live_app/build/app/outputs/flutter-apk/*.apk
